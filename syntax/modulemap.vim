@@ -18,8 +18,8 @@ syntax keyword moduleKeyword nextgroup=modulename
 syntax keyword moduleKeyword
     \ config_macros
     \ exclude
-    \ header
     \ explicit
+    \ header
     \ link
     \ umbrella
 
