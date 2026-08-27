@@ -11,27 +11,36 @@ if !exists('main_syntax')
 endif
 
 " Top-level module keyword
-syntax keyword moduleKeyword nextgroup=modulename
+" module-declaration: explicit? framework? module module-id attributes? '{' ... '}'
+"                    | extern module module-id string-literal
+syntax keyword moduleKeyword nextgroup=moduleName,moduleWildcard skipwhite
     \ module
 
-" Member keywords
+" Member keywords taking a bare string/number argument (highlighted generically
+" by moduleString / the header-attrs handling below)
 syntax keyword moduleKeyword
-    \ config_macros
-    \ exclude
-    \ explicit
     \ header
     \ link
     \ umbrella
 
-" Members specifying module names
+" exclude/private/textual/umbrella are header modifiers: [private] [textual] header "path"
+" or umbrella header "path" / exclude header "path"
+syntax keyword moduleKeyword
+    \ exclude
+
+" config_macros attributes? (identifier (',' identifier)*)?
+syntax keyword moduleKeyword nextgroup=moduleAttributes,moduleMacroName skipwhite
+    \ config_macros
+
+" Members specifying module names (conflict module-id ',' string-literal, etc.)
 syntax keyword moduleKeyword nextgroup=moduleName
     \ conflict
     \ export_as
     \ use
 
-" Modifiers
+" Modifiers: explicit/framework (module), private/textual (header), extern (module)
 syntax keyword moduleKeyword
-    \ exhaustive
+    \ explicit
     \ extern
     \ framework
     \ private
@@ -43,17 +52,19 @@ syntax match moduleIdentifier contained
 syntax match moduleName contains=moduleIdentifier
     \ /\<\%([A-Za-z_][A-Za-z_0-9]*\.\)*[A-Za-z_][A-Za-z_0-9]*\>/
 
-
-" Export declaration and wildcard (using match for the wildcard avoids setting iskeyword)
-" TODO: This does not handle the moduleName.* case yet.
-syntax keyword moduleKeyword nextgroup=moduleName,moduleWildcard 
+" Export declaration and wildcard-module-id (identifier | '*' | identifier '.' wildcard-module-id)
+" Also covers the inferred submodule form: module '*' { export '*' }
+" (using match for the wildcard avoids setting iskeyword)
+syntax keyword moduleKeyword nextgroup=moduleName,moduleWildcard skipwhite
     \ export
-syntax match moduleWildcard keepend
-    \ /\*$/
+syntax match moduleWildcard contains=moduleIdentifier
+    \ /\*\|\<\%([A-Za-z_][A-Za-z_0-9]*\.\)\+\*/
 
-" Feature requirement and known features
+" Feature requirement and known features: requires !?feature (',' !?feature)*
 syntax keyword moduleKeyword nextgroup=moduleFeature
     \ requires
+syntax match moduleFeatureNot
+    \ /!/
 syntax keyword moduleFeature
     \ altivec blocks coroutines
     \ cplusplus cplusplus11 cplusplus14 cplusplus17 cplusplus20 cplusplus23
@@ -63,13 +74,28 @@ syntax keyword moduleFeature
     \ freebsd win32 windows linux ios macos watchos tvos iossimulator
     \ gnu gnueabi android msvc
 
-" Attributes
+" Attributes: '[' identifier ']', e.g. [system] on a module, [exhaustive] on config_macros
+" nextgroup carries the config_macros macro-list chain forward past an attributes block
 syntax region moduleAttributes start=/\[/ skip=/,/ end=/\]/ contains=moduleAttribute
+    \ nextgroup=moduleMacroName skipwhite
 syntax keyword moduleAttribute contained
     \ system
     \ extern_c
     \ no_undeclared_includes
     \ exhaustive
+
+" config_macros macro-list: comma-separated bare identifiers (not module-ids)
+syntax match moduleMacroName contained nextgroup=moduleMacroSeparator skipwhite
+    \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
+syntax match moduleMacroSeparator contained nextgroup=moduleMacroName skipwhite
+    \ /,/
+
+" header-attrs: '{' ( size integer-literal | mtime integer-literal )* '}'
+syntax keyword moduleKeyword nextgroup=moduleNumber skipwhite
+    \ size
+    \ mtime
+syntax match moduleNumber
+    \ /\<[0-9]\+\>/
 
 " TODOs
 syntax keyword moduleTodo HACK FIXME TODO contained
@@ -90,8 +116,13 @@ highlight default link moduleKeyword Statement
 highlight default link moduleString String
 highlight default link moduleTodo Todo
 highlight default link moduleFeature Structure
+highlight default link moduleFeatureNot Operator
+highlight default link moduleAttributes Delimiter
 highlight default link moduleAttribute PreProc
 highlight default link moduleWildcard Character
+highlight default link moduleMacroName Macro
+highlight default link moduleMacroSeparator Delimiter
+highlight default link moduleNumber Number
 
 " Epilog
 let b:current_syntax = 'modulemap'
